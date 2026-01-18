@@ -3,7 +3,7 @@
  * Plugin Name: Better Nginx Cache
  * Plugin URI: https://llego.dev/
  * Description: Purge the Nginx FastCGI cache automatically when content changes (excludes comments) with cache statistics display.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Mark Anthony Llego
  * Author URI: https://llego.dev/
  * License: GPLv3
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants.
-define('BNC_VERSION', '1.0.1');
+define('BNC_VERSION', '1.0.2');
 define('BNC_PLUGIN_FILE', __FILE__);
 define('BNC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BNC_PLUGIN_URL', plugin_dir_url(__FILE__));

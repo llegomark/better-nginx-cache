@@ -4,7 +4,7 @@ Donate link: https://llego.dev/
 Tags: nginx, cache, fastcgi, performance, purge
 Requires at least: 5.0
 Tested up to: 6.9
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -136,6 +136,12 @@ Ensure:
 
 == Changelog ==
 
+= 1.0.2 =
+* **SECURITY**: Fixed potential XSS vulnerability in settings page author link (now uses wp_kses)
+* **FIXED**: Corrected "Purge Triggers" list to accurately reflect implemented triggers
+* **IMPROVED**: Removed unused clear_stats_cache() method from BNC_Cache_Stats class
+* Code cleanup and WordPress Plugin Review Team compliance improvements
+
 = 1.0.1 =
 * **FIXED**: Cache now reliably persists - no more unexpected purges
 * **IMPROVED**: Replaced multiple aggressive hooks (save_post, edit_post, delete_post) with transition_post_status for precise control
@@ -158,6 +164,9 @@ Ensure:
 * Internationalization ready
 
 == Upgrade Notice ==
+
+= 1.0.2 =
+Security fix: Addresses XSS vulnerability in settings page. Recommended update for all users.
 
 = 1.0.1 =
 Important reliability fix: Cache no longer gets deleted unexpectedly. Autosaves, drafts, and revisions no longer trigger purges.

@@ -160,13 +160,4 @@ class BNC_Cache_Stats
         return $comment;
     }
 
-    /**
-     * Clear cached statistics.
-     *
-     * @since 1.0.0
-     */
-    public function clear_stats_cache()
-    {
-        delete_transient('bnc_cache_stats');
-    }
 }

@@ -183,16 +183,10 @@ class BNC_Settings_Page
                                 <?php esc_html_e('Posts/Pages are created, updated, or deleted', 'better-nginx-cache'); ?>
                             </li>
                             <li>
-                                <?php esc_html_e('Theme is changed', 'better-nginx-cache'); ?>
+                                <?php esc_html_e('Theme is changed or customizer saved', 'better-nginx-cache'); ?>
                             </li>
                             <li>
-                                <?php esc_html_e('Menus are updated', 'better-nginx-cache'); ?>
-                            </li>
-                            <li>
-                                <?php esc_html_e('Widgets are modified', 'better-nginx-cache'); ?>
-                            </li>
-                            <li>
-                                <?php esc_html_e('Site settings change', 'better-nginx-cache'); ?>
+                                <?php esc_html_e('Navigation menus are updated', 'better-nginx-cache'); ?>
                             </li>
                         </ul>
                         <p class="description bnc-note">
@@ -218,10 +212,19 @@ class BNC_Settings_Page
                         </p>
                         <p>
                             <?php
-                            printf(
-                                /* translators: %s: Author website link */
-                                esc_html__('By %s', 'better-nginx-cache'),
-                                '<a href="https://llego.dev/" target="_blank" rel="noopener noreferrer">Mark Anthony Llego</a>'
+                            echo wp_kses(
+                                sprintf(
+                                    /* translators: %s: Author website link */
+                                    __('By %s', 'better-nginx-cache'),
+                                    '<a href="https://llego.dev/" target="_blank" rel="noopener noreferrer">Mark Anthony Llego</a>'
+                                ),
+                                array(
+                                    'a' => array(
+                                        'href'   => array(),
+                                        'target' => array(),
+                                        'rel'    => array(),
+                                    ),
+                                )
                             );
                             ?>
                         </p>
