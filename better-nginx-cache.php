@@ -3,7 +3,7 @@
  * Plugin Name: Better Nginx Cache
  * Plugin URI: https://llego.dev/
  * Description: Purge the Nginx FastCGI cache automatically when content changes (excludes comments) with cache statistics display.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Mark Anthony Llego
  * Author URI: https://llego.dev/
  * License: GPLv3
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants.
-define('BNC_VERSION', '1.0.0');
+define('BNC_VERSION', '1.0.1');
 define('BNC_PLUGIN_FILE', __FILE__);
 define('BNC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BNC_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -63,12 +63,7 @@ final class Better_Nginx_Cache
 	 */
 	private $admin_page = 'tools.php?page=better-nginx-cache';
 
-	/**
-	 * Flag to prevent multiple purges per request.
-	 *
-	 * @var bool
-	 */
-	private $purged = false;
+	// Note: Purge flag is now handled with a static variable in purge_cache_once()
 
 	/**
 	 * Get single instance.
@@ -159,44 +154,128 @@ final class Better_Nginx_Cache
 	/**
 	 * Register purge actions for content changes only (excludes comments).
 	 *
+	 * Uses transition_post_status hook for better control over when posts
+	 * actually become published vs. autosaves/drafts/revisions.
+	 *
 	 * @since 1.0.0
+	 * @since 1.0.1 Fixed to use transition_post_status for reliable purging.
 	 */
 	public function register_purge_actions()
 	{
+		// Use transition_post_status for better control over post publishing.
+		// This fires only when post status actually changes, not on autosaves.
+		add_action('transition_post_status', array($this, 'handle_post_status_change'), 10, 3);
+
 		/**
-		 * Filter the actions that trigger cache purge.
+		 * Filter the non-post actions that trigger cache purge.
 		 *
-		 * Note: Comment-related actions are intentionally excluded to prevent
-		 * unnecessary cache invalidation when comments are submitted/moderated.
+		 * Note: Post changes are handled separately via transition_post_status.
+		 * Comment-related actions are intentionally excluded.
 		 *
 		 * @since 1.0.0
+		 * @since 1.0.1 Reduced to only non-post actions for reliability.
 		 * @param array $actions The actions that trigger cache purge.
 		 */
 		$actions = (array) apply_filters(
 			'bnc_purge_actions',
 			array(
-				// Post changes.
-				'save_post',
-				'edit_post',
-				'delete_post',
-				'wp_trash_post',
 				// Theme and appearance.
 				'switch_theme',
 				'customize_save_after',
 				// Navigation.
 				'wp_update_nav_menu',
-				// Core options that affect frontend.
-				'update_option_blogname',
-				'update_option_blogdescription',
-				'update_option_siteurl',
-				'update_option_home',
-				// Widgets and sidebars.
-				'update_option_sidebars_widgets',
 			)
 		);
 
 		foreach ($actions as $action) {
-			add_action($action, array($this, 'purge_cache_once'));
+			// Check if action already fired to prevent duplicate registrations.
+			if (did_action($action)) {
+				$this->purge_cache_once();
+			} else {
+				add_action($action, array($this, 'purge_cache_once'));
+			}
+		}
+	}
+
+	/**
+	 * Handle post status transitions to determine if cache should be purged.
+	 *
+	 * Only purges when a post is being published, unpublished, or deleted.
+	 * Ignores autosaves, revisions, and draft changes.
+	 *
+	 * @since 1.0.1
+	 * @param string  $new_status New post status.
+	 * @param string  $old_status Old post status.
+	 * @param WP_Post $post       Post object.
+	 */
+	public function handle_post_status_change($new_status, $old_status, $post)
+	{
+		// Skip if no post object.
+		if (!$post || !is_object($post)) {
+			return;
+		}
+
+		// Skip revisions and autosaves.
+		if (wp_is_post_revision($post->ID) || wp_is_post_autosave($post->ID)) {
+			return;
+		}
+
+		// Skip internal post types that don't affect the frontend.
+		$skip_types = array('revision', 'nav_menu_item', 'customize_changeset', 'oembed_cache', 'wp_global_styles');
+		if (in_array($post->post_type, $skip_types, true)) {
+			return;
+		}
+
+		/**
+		 * Filter post types excluded from cache purging.
+		 *
+		 * @since 1.0.0
+		 * @param array $excluded_types Array of post type slugs to exclude.
+		 */
+		$excluded_types = (array) apply_filters('bnc_excluded_post_types', array());
+		if (in_array($post->post_type, $excluded_types, true)) {
+			return;
+		}
+
+		// Only purge when:
+		// 1. Post is being published (any status -> publish)
+		// 2. Post is being unpublished (publish -> any other status)
+		// 3. Post is being trashed or deleted (any status -> trash)
+		$should_purge = false;
+
+		// Publishing a post.
+		if ('publish' === $new_status && 'publish' !== $old_status) {
+			$should_purge = true;
+		}
+
+		// Updating an already published post.
+		if ('publish' === $new_status && 'publish' === $old_status) {
+			$should_purge = true;
+		}
+
+		// Unpublishing a post.
+		if ('publish' === $old_status && 'publish' !== $new_status) {
+			$should_purge = true;
+		}
+
+		// Trashing a post.
+		if ('trash' === $new_status) {
+			$should_purge = true;
+		}
+
+		/**
+		 * Filter whether cache should be purged for this status transition.
+		 *
+		 * @since 1.0.1
+		 * @param bool    $should_purge Whether to purge the cache.
+		 * @param string  $new_status   New post status.
+		 * @param string  $old_status   Old post status.
+		 * @param WP_Post $post         Post object.
+		 */
+		$should_purge = apply_filters('bnc_should_purge_on_status_change', $should_purge, $new_status, $old_status, $post);
+
+		if ($should_purge) {
+			$this->purge_cache_once();
 		}
 	}
 
@@ -530,16 +609,27 @@ final class Better_Nginx_Cache
 	/**
 	 * Purge cache (only once per request).
 	 *
+	 * Uses a static variable to ensure the cache is only purged once per
+	 * request, even if multiple triggers fire.
+	 *
 	 * @since 1.0.0
+	 * @since 1.0.1 Changed to use static variable for reliable single-purge.
 	 */
 	public function purge_cache_once()
 	{
-		if ($this->purged) {
+		// Static variable persists across all calls within the same request.
+		static $purged = false;
+
+		if ($purged) {
 			return;
 		}
 
-		$this->purge_cache();
-		$this->purged = true;
+		$result = $this->purge_cache();
+
+		// Only set purged flag if purge was successful or not needed.
+		if (true === $result || false === $result) {
+			$purged = true;
+		}
 	}
 
 	/**
@@ -585,28 +675,24 @@ final class Better_Nginx_Cache
 	}
 
 	/**
-	 * Check if cache should be purged based on post type.
+	 * Check if cache should be purged.
+	 *
+	 * This method is now primarily used for non-post purge triggers.
+	 * Post-related purging is handled by handle_post_status_change().
 	 *
 	 * @since 1.0.0
+	 * @since 1.0.1 Simplified as post type checks moved to handle_post_status_change.
 	 * @return bool True if cache should be purged.
 	 */
 	private function should_purge()
 	{
-		$post_type = get_post_type();
-
-		if (!$post_type) {
-			return true;
-		}
-
 		/**
-		 * Filter post types excluded from cache purging.
+		 * Filter whether cache should be purged.
 		 *
-		 * @since 1.0.0
-		 * @param array $excluded_types Array of post type slugs to exclude.
+		 * @since 1.0.1
+		 * @param bool $should_purge Whether to purge the cache.
 		 */
-		$excluded_types = (array) apply_filters('bnc_excluded_post_types', array());
-
-		return !in_array($post_type, $excluded_types, true);
+		return apply_filters('bnc_should_purge', true);
 	}
 
 	/**

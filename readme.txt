@@ -3,8 +3,8 @@ Contributors: markllego
 Donate link: https://llego.dev/
 Tags: nginx, cache, fastcgi, performance, purge
 Requires at least: 5.0
-Tested up to: 6.7
-Stable tag: 1.0.0
+Tested up to: 6.9
+Stable tag: 1.0.1
 Requires PHP: 7.4
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -136,6 +136,17 @@ Ensure:
 
 == Changelog ==
 
+= 1.0.1 =
+* **FIXED**: Cache now reliably persists - no more unexpected purges
+* **IMPROVED**: Replaced multiple aggressive hooks (save_post, edit_post, delete_post) with transition_post_status for precise control
+* **IMPROVED**: Autosaves, drafts, and revisions no longer trigger cache purges
+* **IMPROVED**: Cache only purges when posts are actually published, updated, unpublished, or trashed
+* **IMPROVED**: Removed option update hooks that caused excessive purging
+* **IMPROVED**: Added did_action() check to prevent duplicate hook registrations
+* **FIXED**: Changed purge flag from instance variable to static variable for reliable single-purge per request
+* **NEW**: Added bnc_should_purge_on_status_change filter for fine-grained control
+* **NEW**: Added bnc_should_purge filter for non-post purge triggers
+
 = 1.0.0 =
 * Initial release
 * Selective cache purging (excludes comments)
@@ -148,6 +159,9 @@ Ensure:
 
 == Upgrade Notice ==
 
+= 1.0.1 =
+Important reliability fix: Cache no longer gets deleted unexpectedly. Autosaves, drafts, and revisions no longer trigger purges.
+
 = 1.0.0 =
 Initial release of Better Nginx Cache.
 
@@ -155,9 +169,13 @@ Initial release of Better Nginx Cache.
 
 = Filters =
 
-**bnc_purge_actions** - Modify the list of WordPress actions that trigger cache purges.
+**bnc_purge_actions** - Modify the list of non-post WordPress actions that trigger cache purges.
 
 **bnc_excluded_post_types** - Exclude specific post types from triggering cache purges.
+
+**bnc_should_purge_on_status_change** - Fine-grained control over whether to purge for specific post status transitions. Receives $should_purge, $new_status, $old_status, $post.
+
+**bnc_should_purge** - Control whether non-post triggers should purge the cache.
 
 = Actions =
 
